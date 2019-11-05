@@ -23,8 +23,22 @@ def load_image_into_numpy_array(image):
     (im_width, im_height) = image.size
     return np.array(image.getdata()).reshape((im_height, im_width, 3)).astype(np.uint8)
 
-TEST_IMAGE_PATHS = ['test_images/image1.jpg', 'test_images/image2.jpg', 'test_images/image3.jpg', 'test_images/image4.jpg']
+#%%
+''' Load Image '''
+VERSION = '10.21.17'
+V_EXTRA = ''
+PATH_TO_SEQUENCE = '/home/tiahu/Documents/Sequence' + VERSION + V_EXTRA
 
+IMAGE_PATH = PATH_TO_SEQUENCE + '/rgb'
+TS_PATH = PATH_TO_SEQUENCE + '/rgb' + VERSION + V_EXTRA + '.txt'
+TS = []
+with open(TS_PATH, 'r+') as f:
+    for line in f:
+        ts = [x.strip() for x in line.split(' ')]
+        TS.append(ts)
+NUM_TS = len(TS)
+
+TEST_IMAGES= ['test_images/image1.jpg', 'test_images/image2.jpg', 'test_images/image3.jpg', 'test_images/image4.jpg']
 #%%
 ''' Load Pre-trained Model '''
 
@@ -80,7 +94,11 @@ with detection_graph.as_default():
 
         TV_BOX = np.array([[0, 0, 0, 0]])
 
-        for image_path in TEST_IMAGE_PATHS:
+        for i in range(2000, NUM_TS, 24):
+
+            str_stamp = TS[i][0]
+            image_path = IMAGE_PATH + '/' + str_stamp + '.png'
+        # for image_path in TEST_IMAGES:
 
             image = Image.open(image_path)  # LOAD IMAGES
             (width, height) = image.size
@@ -96,31 +114,35 @@ with detection_graph.as_default():
             klass = np.squeeze(classes)
             score = np.squeeze(scores)
 
-            tv_index = np.where(klass == 72)
-            tv_box_raw = box[tv_index]
-            tv_box = tv_box_raw.copy()
+            if 72 in klass:
 
-            for i in range(len(tv_box_raw)):
-                tv_box[i, 0] = int(box[i, 0]*height)
-                tv_box[i, 1] = int(box[i, 1]*width)
-                tv_box[i, 2] = int(box[i, 2]*height)
-                tv_box[i, 3] = int(box[i, 3]*width)
+                tv_klass_index = np.where(klass == 72)
+                tv_score_index = np.where(score >= 0.8)
+                tv_index = np.intersect1d(tv_klass_index, tv_score_index)
 
-            tv_box_out = np.concatenate((TV_BOX, tv_box), axis=0)
+                tv_box_raw = box[tv_klass_index]
+                tv_box = tv_box_raw.copy()
 
-            print(tv_box, '\n')
-            vis_util.visualize_boxes_and_labels_on_image_array(
-                image_np,
-                np.squeeze(boxes),
-                np.squeeze(classes).astype(np.int32),
-                np.squeeze(scores),
-                category_index,
-                use_normalized_coordinates=True,
-                line_thickness=8)
+                for j in range(len(tv_box_raw)):
+                    tv_box[j, 0] = int(box[j, 0]*height)
+                    tv_box[j, 1] = int(box[j, 1]*width)
+                    tv_box[j, 2] = int(box[j, 2]*height)
+                    tv_box[j, 3] = int(box[j, 3]*width)
 
-            cv2.imshow(image_path, cv2.resize(cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), (1080, 720)))
+                tv_box_out = np.concatenate((TV_BOX, tv_box), axis=0)
+
+                vis_util.visualize_boxes_and_labels_on_image_array(
+                    image_np,
+                    np.squeeze(boxes),
+                    np.squeeze(classes).astype(np.int32),
+                    np.squeeze(scores),
+                    category_index,
+                    use_normalized_coordinates=True,
+                    line_thickness=8,
+                    min_score_thresh=0.8)
+                # if tv_index.shape[0] !=0:
+                #     cv2.imshow(image_path, cv2.resize(cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), (1080, 720)))
 
 print('Output\n', tv_box_out[1:])
-
 cv2.waitKey(0)
 cv2.destroyAllWindows()
